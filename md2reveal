@@ -52,7 +52,7 @@ MY_LUA_VAR="$HOME/.lib/pandoc/output.lua"
 MY_REVEALJS_VAR="./reveal.js"
 MY_THEME_VAR="hifis1080p"
 MY_LEVEL_VAR=2
-
+MY_TITLE_BACKGOUND="./reveal.js/dist/theme/images/hifis-background-title.svg"
 
 #-------------#
 
@@ -514,14 +514,26 @@ fi
 
 function set_background(){
 
+MY_TITLE_BACKGOUND
 local color_image=titlebackgroundcolor.png
 local flag_image=$(check_file $title_background)
 local flag_color=$(check_variable $title_background_color)
 local flag_color_image=$(check_file $color_image)
 
+if [[ $setlocal == 0 && flag_image != 0 ]]; then
+    title_background=$MY_TITLE_BACKGOUND
+    flag_image=0
+fi
+
 #-- Checks
 if  [[ $flag_image == 0 && $flag_color == 0 ]]; then
     die "Title background image and color is defined. Please chose one only."
+fi
+
+#-- set local option
+if [[ $setlocal == 0 && flag_image != 0 ]]; then
+    title_background=$MY_TITLE_BACKGOUND
+    flag_image=0
 fi
 
 #-- applying image settings
@@ -596,10 +608,10 @@ function create_pdf(){
 
 if [[ "$create_pdf" == 0 ]]; then
     local filebase="${1%.*}"
+    echo "decktape automatic --size $printsize $1 $filebase.pdf"
     decktape automatic --size $printsize $1 $filebase.pdf
     exit 0
 fi
-
 
 }
 
@@ -612,7 +624,7 @@ fi
 argparser $@
 
 #==== PDF ====#
-create_pdf $1
+create_pdf $input
 
 #==== PREPROCESSING ====#
 #-- Pandoc settings --#
@@ -649,7 +661,7 @@ set_background $outfile
 set_video_plugin $outfile
 
 #==== Clean Up ====#
-#rm $tmp$input
+rm $tmp$input
 
 #=== END ===#
 
