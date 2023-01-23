@@ -52,7 +52,7 @@ MY_LUA_VAR="$HOME/.lib/pandoc/output.lua"
 MY_REVEALJS_VAR="./reveal.js"
 MY_THEME_VAR="hifis1080p"
 MY_LEVEL_VAR=2
-MY_TITLE_BACKGOUND="./reveal.js/dist/theme/images/hifis-background-title.svg"
+MY_TITLE_BACKGOUND="./reveal.js/dist/theme/images/hifis-background-title-1080p.svg"
 
 #-------------#
 
