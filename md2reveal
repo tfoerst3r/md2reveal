@@ -1,28 +1,14 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2022 Thomas Foerster
-# SPDX-License-Identifier: CC0-1.0 
 
-#: Title       : generate_mkdocs
-#: Date        : 2022-11-30
-#: Author      : Thomas Foerster
-#: Version     : 0.1
-#: Description : Generate reveal.js presentation via pandoc
-#: Note        : Put this file in your PATH variable and make it executable.
-# : Required    
-#   - pandoc 2.12
-#   - reveal.js (github)
-
-#== Set Variables ==#
-#-- Init values and templates --#
-back=0
-local_var=0
-date_var=0
-toc_var=0
-level=2
-depend=1
-theme="black"
-pretmp="tmp_"
-KROKI_SERVER='https://kroki.my.domain/'
+setlocal=1
+self_contained=1
+date_var=1
+toc_var=1
+back_var=1
+create_pdf=1
+tmp="tmp_"
+#-- You can set the kroki, see docu to pandoc-kroki on github
+#KROKI_VAR=
 
 #-- Basic option settings
 texdef="
@@ -36,73 +22,39 @@ texdef="
 
 "
 
-#-- default path variables --#
-BIB_FILE="$HOME/literature/literature.bib"
-REVEALJS_PATH="/opt/reveal.js"
-KATEX_PATH="/opt/katex/"
+#-- General options
+#.. katex CDN, see https://cdnjs.com/libraries/KaTeX
+#.. revealjs CDN, see https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.js
+#.. defaults to https://unpkg.com/reveal.js@^4/
+
+#== Empty Variables ==#
+bibliography=
+latex=
+lua=
+revealjs=
+theme=
+level=
+title_background=
+title_background_color=
+
+#== Default Settings ==#
+BIB_VAR="./literature.bib"
+LATEX_VAR=
+LUA_VAR=
+#REVEALJS_VAR="./reveal.js/" #not needed, web resource
+THEME_VAR="black"
+LEVEL_VAR=2
+
+#== My Default Settings ==#
+MY_BIB_VAR="$HOME/literature/literature.bib"
+MY_LATEX_VAR="/opt/katex/"
+MY_LUA_VAR="$HOME/.lib/pandoc/output.lua"
+MY_REVEALJS_VAR="/opt/reveal.js"
+MY_THEME_VAR="hifis"
+MY_LEVEL_VAR=2
 
 
-#== START BASH ROUTINE ==#
-function dependency_setting {
-    #.. setting the dependency level, the lower the more dependet on web connection
-    #.. accordingly to the setting 
-    local options=" \
-        --to=revealjs \
-        --filter pandoc-tablenos \
-        --filter pandoc-fignos \
-        --filter pandoc-eqnos \
-        --filter pandoc-kroki \
-        --lua-filter ${HOME}/.lib/pandoc/output.lua \
-        --citeproc \
-        --bibliography=${BIB_FILE} \
-        --metadata link-citations=false"
-    
-    if [ "$depend" = 1 ]; then
-        #-- depend level 1, dependet, all infos should be embedded
-        #-- General options
-        #.. katex CDN, see https://cdnjs.com/libraries/KaTeX
-        #.. revealjs CDN, see https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.js
-        local options="$options \
-            --katex \
-            --metadata theme=$theme"
-    
-    elif [[ "$depend" == 2 ]]; then
-        #-- level 2, global flag
-        #-- General options 
-        local options="$options \
-            --katex=${KATEX_PATH} \
-            --variable revealjs-url=${REVEALJS_PATH}"
-    
-    elif [[ "$depend" == 3 ]]; then
-        #-- level 3, all local
-        local options="$options \
-            --katex \
-            --variable revealjs-url=./reveal.js"
-    else
-        #.. self-contained embeds css, images ... and others in the html file
-        local options="Not implemented yet!" 
-        #--self-contained"
-    fi
-    
-    echo "$options"
-}
-
-function slidelevel {
-
-    if [[ "$level" == 1 ]]; then
-        sed -i 's/^##/#/' tmp_$input
-        local revealjsLevel="--slide-level=1"
-    elif [[ "$level" == 2 ]]; then
-        local revealjsLevel="--slide-level=2"
-    elif [[ "$level" == 0 ]]; then
-        local revealjsLevel="--slide-level=0"
-    else
-        echo "Only slide levels 0, 1 and 2 are valid." >&2
-        exit 1
-    fi
-
-    echo "$revealjsLevel"
-}
+#-------------#
 
 function die() {
     local scrname=$(basename "$0")
@@ -116,6 +68,376 @@ function msg() {
 }
 
 trap 'die "Execution aborted."' 1 2 3 9 15
+
+#-------------#
+
+function check_folder {
+
+while [ -n "$1" ]; do
+
+    if [[ -d $1 ]]
+    then
+        echo "0"
+        shift
+    else
+        echo "1"
+        shift
+    fi
+
+done
+}
+
+#-------------#
+
+function check_file {
+
+while [ -n "$1" ]; do
+
+    if [[ -f $1 ]]
+    then
+        echo "0"
+        shift
+    else
+        echo "1"
+        shift
+    fi
+
+done
+}
+
+#-------------#
+
+function check_variable(){
+    if [[ -z ${1+xxx} ]]; then 
+        # VAR is not set at all
+        echo "2"
+    elif [[ -z $1 ]] && [[ ${1+xxx} == "xxx" ]]; then 
+        # VAR is set but empty
+        echo "1"
+    elif [[ ! -z $1 ]]; then 
+        # VAR is set 
+        echo "0"
+    else
+        # VAR has an unknown configuration
+        echo "3"
+    fi
+}
+
+#-------------#
+#-------------#
+#-------------#
+
+function set_bibliography(){
+
+local option="--bibliography"
+local postoption="--citeproc"
+local setting_manually="$bibliography"
+local setting_default=$BIB_VAR
+local setting_my=$MY_BIB_VAR
+
+if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+    
+    if [[ $(check_variable $setting_my) == 0 ]]; then
+        # variable set manually
+        local var="$option=$setting_my $postoption"
+    elif [[ $(check_variable $setting_my) == 2 ]]; then
+        # variable not set, default
+        local var="$option=$setting_default $postoption"
+    fi 
+
+elif [[ $(check_variable $setting_manually) == 0 ]]; then
+    
+    if [[ $(check_file $setting_manually) != 0 ]]; then
+        die "The given bib file $setting_manually does not exist."
+    else
+        # variable set manually
+        local var="$option=$setting_manually $postoption"
+    fi
+
+elif [[ $(check_variable $setting_manually) == 2 ]]; then
+    
+    # variable not set, default
+    local var=""
+
+else
+    
+    die "Error with the bibliography option"
+
+fi
+
+#..return value
+echo "$var"
+
+}
+
+#-------------#
+
+function set_latex(){
+
+local option="--katex"
+local setting_manually="$latex"
+local setting_default=$LATEX_VAR
+local setting_my=$MY_LATEX_VAR
+
+if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+
+    # variable not set, my default
+    if [[ $(check_variable $setting_my) == 0 ]]; then
+        # variable set manually
+        local var="$option=\"$setting_my\""
+    elif [[ $(check_variable $setting_my) == 2 ]]; then
+        # variable not set, default
+        local var="$option"
+    fi 
+
+elif [[ $(check_variable $setting_manually) == 0 ]]; then
+    
+    if [[ $(check_folder $setting_manually) != 0 ]]; then
+        die "The given latex path $setting_manually does not exist."
+    else
+        # variable set manually
+        local var="$option=\"$setting_manually\""
+    fi
+
+elif [[ $(check_variable $setting_manually) == 2 ]]; then
+    
+    # variable not set, default
+    local var="$option"
+else
+    
+    die "Error with the latex option"
+
+fi
+#..return value
+echo "$var"
+}
+
+#-------------#
+
+function set_lua(){
+
+local option="--lua-filter"
+local setting_manually="$lua"
+local setting_default=$LATEX_VAR
+local setting_my=$MY_LUA_VAR
+
+if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+
+    # variable not set, my default
+    if [[ $(check_variable $setting_my) == 0 ]]; then
+        # variable set manually
+        local var="$option $setting_my"
+    elif [[ $(check_variable $setting_my) == 2 ]]; then
+        # variable not set, default
+        local var=""
+    fi 
+
+elif [[ $(check_variable $setting_manually) == 0 ]]; then
+    
+    if [[ $(check_file $setting_manually) != 0 ]]; then
+        die "The given lua file $setting_manually does not exist."
+    else
+        # variable set manually
+        local var="$option=$setting_manually"
+    fi
+
+elif [[ $(check_variable $setting_manually) == 2 ]]; then
+    
+    # variable not set, default
+    local var=""
+else
+    
+    die "Error with the lua option"
+
+fi
+#..return value
+echo "$var"
+}
+
+#-------------#
+
+function set_revealjs(){
+
+local option="--variable revealjs-url"
+local setting_manually="$revealjs"
+local setting_default=$REVEALJS_VAR
+local setting_my=$MY_REVEALJS_VAR
+
+if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+    
+    # variable not set, my default
+    if [[ $(check_variable $setting_my) == 0 ]]; then
+        # variable set manually
+        local var="$option=$setting_my"
+    elif [[ $(check_variable $setting_my) == 2 ]]; then
+        # variable not set, default
+        local var=""
+    fi 
+
+elif [[ $(check_variable $setting_manually) == 0 ]]; then
+    
+    if [[ $(check_folder $setting_manually) != 0 ]]; then
+        die "The given reveal.js path $setting_manually does not exist."
+    else
+        # variable set manually
+        local var="$option=$setting_manually"
+    fi
+
+elif [[ $(check_variable $setting_manually) == 2 ]]; then
+    
+    # variable not set, default
+    local var=""
+
+else
+    
+    die "Error with the bibliography option"
+
+fi
+
+#..return value
+echo "$var"
+
+}
+
+#-------------#
+
+function set_theme(){
+
+local option="--metadata theme"
+local setting_manually="$theme"
+local setting_default=$THEME_VAR
+local setting_my=$MY_THEME_VAR
+
+if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+    
+    if [[ $(check_variable $setting_my) == 0 ]]; then
+        # variable set manually
+        local var="$option=$setting_my"
+    elif [[ $(check_variable $setting_my) == 2 ]]; then
+        # variable not set, default
+        local var="$option=$setting_default"
+    fi 
+
+elif [[ $(check_variable $setting_manually) == 0 ]]; then
+    
+    local var="$option=$setting_manually"
+
+elif [[ $(check_variable $setting_manually) == 2 ]]; then
+    
+    # variable not set, default
+    local var="$option=$setting_default"
+
+else
+    
+    die "Error with the bibliography option"
+
+fi
+
+#..return value
+echo "$var"
+
+}
+
+#-------------#
+
+
+function set_slidelevel {
+
+local option="--slide-level"
+local setting_manually="$level"
+local setting_default=$LEVEL_VAR
+local setting_my=$MY_LEVEL_VAR
+
+#-- check if levels are not higher then 2
+if [[ $setting_manually > 2 || $setting_default > 2 || $setting_my > 2 ]]; then
+
+    die "Only slide levels 0, 1 and 2 are valid."
+
+fi
+
+if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+    
+    if [[ $(check_variable $setting_my) == 0 ]]; then
+        # variable set manually
+        local var="$option=$setting_my"
+    elif [[ $(check_variable $setting_my) == 2 ]]; then
+        # variable not set, default
+        local var="$option=$setting_default"
+    fi 
+
+elif [[ $(check_variable $setting_manually) == 0 ]]; then
+    
+    local var="$option=$setting_manually"
+
+elif [[ $(check_variable $setting_manually) == 2 ]]; then
+    
+    # variable not set, default
+    local var="$option=$setting_default"
+
+else
+    
+    die "Error with the bibliography option"
+
+fi
+
+#..return value
+echo "$var"
+
+}
+
+#-------------#
+
+function configure_pandoc_settings(){
+#function set_pandoc_optionsdependency_setting {
+
+#.. setting the dependency level, the lower the more dependet on web connection
+#.. accordingly to the setting 
+local set_options="\
+--standalone \
+--to=revealjs \
+--filter pandoc-tablenos \
+--filter pandoc-fignos \
+--filter pandoc-eqnos \
+--filter pandoc-kroki \
+--metadata link-citations=false"
+
+#.. set bibliograhy 
+local set_options="$set_options $(set_bibliography)"
+
+#.. set latex compiler
+local set_options="$set_options $(set_latex)"
+
+#.. set lua filter
+local set_options="$set_options $(set_lua)"
+
+#.. set revealjs path
+local set_options="$set_options $(set_revealjs)"
+
+#.. set theme
+local set_options="$set_options $(set_theme)"
+
+#.. set slidelevel
+local set_options="$set_options $(set_slidelevel)"
+
+#.. set display status of table of content
+if [[ "$toc_var" == 0 ]]; then
+    local set_options="$set_options --toc --toc-depth=1"
+fi
+ 
+#.. set display status of data on the title
+if [[ "$date_var" == 0 ]]; then
+    local set_options="$set_options -M date=`date +%d.%m.%Y`"
+fi
+
+#.. set self contained option, not recommanded
+if [[ $self_contained == 0 ]]; then
+    local set_options="$set_options --embed-resources"
+fi
+
+echo "$set_options"
+}
+
+#-------------#
 
 function printhelp() {
 cat <<-EOM
@@ -131,112 +453,231 @@ Example of usage:
   md2reveal report.md 
 
 Options:
-      --dependent NUM     dependency on online resources 
-                          NUM=1 (high) uses online resources for katex and revealjs
-                          NUM=2 (system global) uses local installations of katex and revealjs (recommanded, default)
-                          NUM=3 (self-contained) all informations are stored in the one file
-      --slide-level NUM   How slides are defined
-                          NUM=0 slides are determined by -----
-                          NUM=1 slides are determined by heading level 1 
-                          NUM=2 slides and subslides are determined by heading level 1 and 2
-      --background STR    Relative location of the title page background
-      --date              today date is printed
-                          input will be overwritten
-      --back1             set one level back
- -o   --output            determines output file name 
+
+ -h   --help                       prints this help message and exit
+ -o   --output                     determines output file name 
+      --local                      uses your own default settings, TODO still in the script itself
+      --bibliography STR           location of your citation file *.bib format
+      --latex STR                  location of your katex interpreter
+      --lua STR                    location of additional lua filter 
+      --revealjs STR               location of your revealjs installation
+      --theme                      name of the used theme 
+      --level NUM                  level definitions  
+                                   NUM=0 slides are determined by dashes (min. 4 ----)
+                                   NUM=1 slides are determined by heading level 1 
+                                   NUM=2 slides and subslides are determined by heading level 1 & 2
+      
+      --self-contained             generated html file will be self contained, not recommended 
+      --title-background STR       location of an additional title background image
+      --title-background-color STR hash color code for an additional colored title background
+      --remove-one-level           set one presentation one level back, removes the # headers
+      --date                       adds today to the title
+      --toc                        adds an table of content as the second slide
+      --pdf STR                    creats an pdf from a given *.html presentation and exits
+ 
 -------------------------------------------------------
- -h   --help                print help message and exit
 
 NOTE: none 
 
 EOM
 }
 
+#-------------#
+
+function argparser(){
 
 # parse options
 while [ -n "$1" ]; do
-    case $1 in
-      -h  | --help ) printhelp && exit 0 ;;
-      -o  | --output ) outfile="$2"; shift 2 ;;
-      -b1 | --back1 ) back=1; shift ;;
-      --dependent ) depend="$2"; shift 2 ;;
-      --theme ) theme="$2"; shift 2 ;;
-      --date ) date_var=1; shift ;;
-      --toc ) toc_var=1; shift ;;
-      --bibliography ) BIB_FILE="$2"; shift 2 ;;
-      --slide-level ) level="$2"; shift 2 ;;
-      --background ) background="$2"; shift 2 ;;
-      -- ) shift; break ;;
-      -* ) msg "unknown option (ignored): $1"; shift ;;
-      * ) break ;;
-    esac
+  case $1 in
+    -h  | --help                   ) printhelp && exit 0 ;;
+    -o  | --output                 ) outfile="$2"; shift 2 ;;
+          --local                  ) setlocal=0; shift 1 ;;
+          --bibliography           ) bibliography="$2"; shift 2 ;;
+          --latex                  ) latex="$2"; shift 2 ;;
+          --lua                    ) lua="$2"; shift 2 ;;
+          --revealjs               ) revealjs="$2"; shift 2 ;;
+          --theme                  ) theme="$2"; shift 2 ;;
+          --level                  ) level="$2"; shift 2 ;;
+          --self-contained         ) self_contained=0; shift 1 ;;
+          --title-background       ) title_background="$2"; shift 2 ;;
+          --title-background-color ) title_background_color="$2"; shift 2 ;;
+          --date                   ) date_var=0; shift ;;
+          --toc                    ) toc_var=0; shift ;;
+          --remove-one-level       ) back_var=0; shift ;;
+          --pdf                    ) create_pdf=0; printsize=$2; shift 2 ;;
+          --                       ) shift; break ;;
+          -*                       ) msg "unknown option (ignored): $1"; shift ;;
+          *                        ) break ;;
+  esac
 done
 
-#==== CHECKS ====#
-if [ -f "$1" ]; then
-    input="$1"
-    cp $input $pretmp$input
+#-- checks --#
+if [[ $(check_file $1) == 0 && ${1##*.} == md ]]; then
+    input=$1
+elif [[ $(check_file $1) == 0 && ${1##*.} == html && $create_pdf == 0 ]]; then
+    input=$1
 else
-    die "$1 not found."
+    die "No input markdown file with the extension *.md is given."
 fi
+
+}    
+
+#== POST PROCESSING FUNCTIONS ==#
+
+#-----------------------#
+
+function set_background(){
+
+local color_image=titlebackgroundcolor.png
+local flag_image=$(check_file $title_background)
+local flag_color=$(check_variable $title_background_color)
+local flag_color_image=$(check_file $color_image)
+
+echo $1
+
+#-- Checks
+if  [[ $flag_image == 0 && $flag_color == 0 ]]; then
+    die "Title background image and color is defined. Please chose one only."
+fi
+
+#-- applying image settings
+if  [[ $flag_image == 0 ]]; then
+
+    sed -i "s;id=\"title-slide\";& data-background-image=$titlebackground;" $1
+    echo "Title Background is set to: $titlebackground"
+
+elif  [[ $flag_color == 0 ]]; then
+    
+    if [[ $flag_color_image == 0 ]]; then
+        echo "Background color image $color_image will be overwritten."   
+    fi
+    convert -size 3000x3000 xc:$title_background_color $color_image
+    sed -i "s;id=\"title-slide\";& data-background-image=$color_image;" $1
+    echo "Title Background is set to color $title_background_color"
+fi
+
+}
+
+#-----------------------#
+
+function set_document_level(){
+#-- if level 1, it removes all 2nd levels
+if [[ "$level" == 1 ]]; then
+    sed -i 's/^##/#/' $1
+fi
+}
+
+#-----------------------#
+
+function set_document_onelevel_back(){
+#-- remove one level
+#.. can be usefull if just want to show content and
+#.. not add a lot of extra slides, due to subtitle pages
+if [ "$back_var" == 0 ]; then
+    sed -i '/^# [a-Z]/d' $1
+    sed -i 's/^#//' $1
+fi
+}
+
+#-----------------------#
+
+function preprocessing_document(){
+#-- reassemble document 
+#.. add tex header
+#.. remove content between meta block and first header, otherwise an additional page will be created
+
+local document=$1
+
+local meta=$(sed -n '/^---$/,/^---$/p' $document)
+local first_slide_header=$(sed -n '/^# [a-zA-Z0-9]/p' $document | head -n 1)
+local header=$(echo "$meta"; echo $'\n'; echo "$first_slide_header") 
+local body=$(cat $document | sed '/^---$/,/^# [a-zA-Z0-9]/d') 
+
+echo $texdef > tex.md
+echo $meta > meta.md
+
+echo "$header $texdef $body" > $1
+
+}
+
+#-----------------------#
+
+function set_video_plugin(){
+#.. add video.js online resource link in the head
+local videojs="<link href=\"//vjs.zencdn.net/7.10.2/video-js.min.css\" rel=\"stylesheet\">\n<script src=\"//vjs.zencdn.net/7.10.2/video.min.js\"></script>"
+#.. append the string
+sed -i "/<head>/a $videojs" $1
+}
+
+#-----------------------#
+
+function create_pdf(){
+
+if [[ "$create_pdf" == 0 ]]; then
+    local filebase="${1%.*}"
+    decktape automatic --size $printsize $1 $filebase.pdf
+    exit 0
+fi
+
+
+}
+
+#-----------------------#
+#----- Main Script -----#
+#-----------------------#
+
+#==== Argument parser ====#
+#.. setting, do not use a subshell for this
+argparser $@
+
+#==== PDF ====#
+create_pdf $1
 
 #==== PREPROCESSING ====#
-#-- remove one level was set
-if [ "$back" == 1 ]; then
-    sed -i '/^# [a-Z]/d' $pretmp$input 
-    sed -i 's/^#//' $pretmp$input
-fi
+#-- Pandoc settings --#
+pandoc_options=$(configure_pandoc_settings)
 
-#-- output name was set
-if [ -z $outfile ]; then
+#-- set output name --#
+if [[ -z $outfile ]]; then
     outfile="${input%.*}_pres.html"
-    echo "Output is set to $outfile"
-else
-    echo "Output is set to $outfile"
 fi
+echo "----------------------------"
+echo "Output is set to $outfile"
+echo "----------------------------"
 
-#-- TEX OPTIONS --#
-#.. extract and clean up the header till the first heading
-meta=$(sed -n '/^---/,/^---/p' $pretmp$input)
-first_slide_header=$(sed -n '/^# [a-zA-Z0-9]/p' $pretmp$input | head -n 1)
-header=$(echo "$meta"; echo $'\n'; echo "$first_slide_header") 
+#-- document cleanup
+cp $input $tmp$input
 
-#.. merge file
-body=$(cat $pretmp$input | sed '/^---/,/^# [a-zA-Z0-9]/d') 
-echo "$header $texdef $body" > $pretmp$input
+#.. set level of the document
+set_document_level $tmp$input
+set_document_onelevel_back $tmp$input
 
-#-- PANDOC OPTIONS --#
-options="$(dependency_setting)"
-revealjsLevel="$(slidelevel)"
-# data was set
-if [[ "$date_var" == 1 ]]; then
-    options="$options -M date=`date +%d.%m.%Y`"
-fi
+#.. preprocess and clean up 
+preprocessing_document $tmp$input
 
-# Table of Content (toc) was set
-if [[ "$toc_var" == 1 ]]; then
-    options="$options --toc --toc-depth=1"
-fi
-options="$options $revealjsLevel"
+#==== MAIN DOCUMENT CREATION AND POSTCOMPILING PROCESSING ====#
 
-#==== CONVERSION to HTML ====#
-printf "%b\n" "pandoc \n$options -s \n tmp_$input -o $outfile"
-pandoc $options -s tmp_$input -o $outfile
+#.. main target script
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+echo "pandoc $pandoc_options $tmp$input -o $outfile"
+pandoc $pandoc_options $tmp$input -o $outfile
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-#==== POSTPROCESSING ====#
-#-- todo: what does the next 4 lines do? and what for
-sed -i "s/TeX-AMS_HTML-full/local\/local_reveal/" $outfile
-sed -i '/cdnjs\.cloudflare/d' $outfile
-sed -i 's/<figcaption>/\n&/g' $outfile
-sed -i "/src=\"\"/d" $outfile
+#==== PREPROCESSING ====#
+set_background $outfile
+set_video_plugin $outfile
 
-echo $background
-
-#-- checks if variable not empty
-if ! [[ -z "$background" ]]; then
-    echo 'Not empty'
-    sed -i "s;id=\"title-slide\";& data-background-image=$background;" $outfile
-fi
 #==== Clean Up ====#
-rm $pretmp$input
+rm $tmp$input
+
+#=== END ===#
+
+
+# ---- TRAY ---- #
+##-- todo: what does the next 4 lines do? and what for
+#sed -i "s/TeX-AMS_HTML-full/local\/local_reveal/" $outfile
+#sed -i '/cdnjs\.cloudflare/d' $outfile
+#sed -i 's/<figcaption>/\n&/g' $outfile
+#sed -i "/src=\"\"/d" $outfile
+
 
