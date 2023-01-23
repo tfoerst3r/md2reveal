@@ -1,0 +1,242 @@
+#!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2022 Thomas Foerster
+# SPDX-License-Identifier: CC0-1.0 
+
+#: Title       : generate_mkdocs
+#: Date        : 2022-11-30
+#: Author      : Thomas Foerster
+#: Version     : 0.1
+#: Description : Generate reveal.js presentation via pandoc
+#: Note        : Put this file in your PATH variable and make it executable.
+# : Required    
+#   - pandoc 2.12
+#   - reveal.js (github)
+
+#== Set Variables ==#
+#-- Init values and templates --#
+back=0
+local_var=0
+date_var=0
+toc_var=0
+level=2
+depend=1
+theme="black"
+pretmp="tmp_"
+KROKI_SERVER='https://kroki.my.domain/'
+
+#-- Basic option settings
+texdef="
+
+\newcommand{\diff}{\mathrm{d}}
+\newcommand{\si}[1]{\mathrm{#1}}
+\newcommand{\SI}[2]{#1\,\mathrm{#2}}
+\newcommand{\*}{\ }
+\newcommand{\std}{\mathrm{o}}
+\newcommand{\surf}[1]{#1^{\prime\prime}}
+
+"
+
+#-- default path variables --#
+BIB_FILE="$HOME/literature/literature.bib"
+REVEALJS_PATH="/opt/reveal.js"
+KATEX_PATH="/opt/katex/"
+
+
+#== START BASH ROUTINE ==#
+function dependency_setting {
+    #.. setting the dependency level, the lower the more dependet on web connection
+    #.. accordingly to the setting 
+    local options=" \
+        --to=revealjs \
+        --filter pandoc-tablenos \
+        --filter pandoc-fignos \
+        --filter pandoc-eqnos \
+        --filter pandoc-kroki \
+        --lua-filter ${HOME}/.lib/pandoc/output.lua \
+        --citeproc \
+        --bibliography=${BIB_FILE} \
+        --metadata link-citations=false"
+    
+    if [ "$depend" = 1 ]; then
+        #-- depend level 1, dependet, all infos should be embedded
+        #-- General options
+        #.. katex CDN, see https://cdnjs.com/libraries/KaTeX
+        #.. revealjs CDN, see https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.js
+        local options="$options \
+            --katex \
+            --metadata theme=$theme"
+    
+    elif [[ "$depend" == 2 ]]; then
+        #-- level 2, global flag
+        #-- General options 
+        local options="$options \
+            --katex=${KATEX_PATH} \
+            --variable revealjs-url=${REVEALJS_PATH}"
+    
+    elif [[ "$depend" == 3 ]]; then
+        #-- level 3, all local
+        local options="$options \
+            --katex \
+            --variable revealjs-url=./reveal.js"
+    else
+        #.. self-contained embeds css, images ... and others in the html file
+        local options="Not implemented yet!" 
+        #--self-contained"
+    fi
+    
+    echo "$options"
+}
+
+function slidelevel {
+
+    if [[ "$level" == 1 ]]; then
+        sed -i 's/^##/#/' tmp_$input
+        local revealjsLevel="--slide-level=1"
+    elif [[ "$level" == 2 ]]; then
+        local revealjsLevel="--slide-level=2"
+    elif [[ "$level" == 0 ]]; then
+        local revealjsLevel="--slide-level=0"
+    else
+        echo "Only slide levels 0, 1 and 2 are valid." >&2
+        exit 1
+    fi
+
+    echo "$revealjsLevel"
+}
+
+function die() {
+    local scrname=$(basename "$0")
+    echo "$scrname: $1" >&2
+    exit 1
+}
+
+function msg() {
+    local scrname=$(basename "$0")
+    echo "$scrname: $1" >&2
+}
+
+trap 'die "Execution aborted."' 1 2 3 9 15
+
+function printhelp() {
+cat <<-EOM
+
+Usage: md2reveal [OPTION]... FILE
+Converts markdown file via pandoc to a html presentation using reveal.js.
+
+Requirements:
+  - pandoc v2.12 and above
+  - reveal.js from https://github.com/hakimel/reveal.js/
+
+Example of usage:
+  md2reveal report.md 
+
+Options:
+      --dependent NUM     dependency on online resources 
+                          NUM=1 (high) uses online resources for katex and revealjs
+                          NUM=2 (system global) uses local installations of katex and revealjs (recommanded, default)
+                          NUM=3 (self-contained) all informations are stored in the one file
+      --slide-level NUM   How slides are defined
+                          NUM=0 slides are determined by -----
+                          NUM=1 slides are determined by heading level 1 
+                          NUM=2 slides and subslides are determined by heading level 1 and 2
+      --background STR    Relative location of the title page background
+      --date              today date is printed
+                          input will be overwritten
+      --back1             set one level back
+ -o   --output            determines output file name 
+-------------------------------------------------------
+ -h   --help                print help message and exit
+
+NOTE: none 
+
+EOM
+}
+
+
+# parse options
+while [ -n "$1" ]; do
+    case $1 in
+      -h  | --help ) printhelp && exit 0 ;;
+      -o  | --output ) outfile="$2"; shift 2 ;;
+      -b1 | --back1 ) back=1; shift ;;
+      --dependent ) depend="$2"; shift 2 ;;
+      --theme ) theme="$2"; shift 2 ;;
+      --date ) date_var=1; shift ;;
+      --toc ) toc_var=1; shift ;;
+      --bibliography ) BIB_FILE="$2"; shift 2 ;;
+      --slide-level ) level="$2"; shift 2 ;;
+      --background ) background="$2"; shift 2 ;;
+      -- ) shift; break ;;
+      -* ) msg "unknown option (ignored): $1"; shift ;;
+      * ) break ;;
+    esac
+done
+
+#==== CHECKS ====#
+if [ -f "$1" ]; then
+    input="$1"
+    cp $input $pretmp$input
+else
+    die "$1 not found."
+fi
+
+#==== PREPROCESSING ====#
+#-- remove one level was set
+if [ "$back" == 1 ]; then
+    sed -i '/^# [a-Z]/d' $pretmp$input 
+    sed -i 's/^#//' $pretmp$input
+fi
+
+#-- output name was set
+if [ -z $outfile ]; then
+    outfile="${input%.*}_pres.html"
+    echo "Output is set to $outfile"
+else
+    echo "Output is set to $outfile"
+fi
+
+#-- TEX OPTIONS --#
+#.. extract and clean up the header till the first heading
+meta=$(sed -n '/^---/,/^---/p' $pretmp$input)
+first_slide_header=$(sed -n '/^# [a-zA-Z0-9]/p' $pretmp$input | head -n 1)
+header=$(echo "$meta"; echo $'\n'; echo "$first_slide_header") 
+
+#.. merge file
+body=$(cat $pretmp$input | sed '/^---/,/^# [a-zA-Z0-9]/d') 
+echo "$header $texdef $body" > $pretmp$input
+
+#-- PANDOC OPTIONS --#
+options="$(dependency_setting)"
+revealjsLevel="$(slidelevel)"
+# data was set
+if [[ "$date_var" == 1 ]]; then
+    options="$options -M date=`date +%d.%m.%Y`"
+fi
+
+# Table of Content (toc) was set
+if [[ "$toc_var" == 1 ]]; then
+    options="$options --toc --toc-depth=1"
+fi
+options="$options $revealjsLevel"
+
+#==== CONVERSION to HTML ====#
+printf "%b\n" "pandoc \n$options -s \n tmp_$input -o $outfile"
+pandoc $options -s tmp_$input -o $outfile
+
+#==== POSTPROCESSING ====#
+#-- todo: what does the next 4 lines do? and what for
+sed -i "s/TeX-AMS_HTML-full/local\/local_reveal/" $outfile
+sed -i '/cdnjs\.cloudflare/d' $outfile
+sed -i 's/<figcaption>/\n&/g' $outfile
+sed -i "/src=\"\"/d" $outfile
+
+echo $background
+
+#-- checks if variable not empty
+if ! [[ -z "$background" ]]; then
+    echo 'Not empty'
+    sed -i "s;id=\"title-slide\";& data-background-image=$background;" $outfile
+fi
+#==== Clean Up ====#
+rm $pretmp$input
+
