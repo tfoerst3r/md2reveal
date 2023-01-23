@@ -91,18 +91,17 @@ done
 
 function check_file {
 
-while [ -n "$1" ]; do
+if [ -n "$1" ]; then
 
-    if [[ -f $1 ]]
-    then
+    if [[ -f $1 ]]; then
         echo "0"
-        shift
     else
         echo "1"
-        shift
     fi
 
-done
+else
+    echo "1"
+fi
 }
 
 #-------------#
@@ -514,31 +513,19 @@ fi
 
 function set_background(){
 
-MY_TITLE_BACKGOUND
 local color_image=titlebackgroundcolor.png
 local flag_image=$(check_file $title_background)
 local flag_color=$(check_variable $title_background_color)
 local flag_color_image=$(check_file $color_image)
-
-if [[ $setlocal == 0 && flag_image != 0 ]]; then
-    title_background=$MY_TITLE_BACKGOUND
-    flag_image=0
-fi
 
 #-- Checks
 if  [[ $flag_image == 0 && $flag_color == 0 ]]; then
     die "Title background image and color is defined. Please chose one only."
 fi
 
-#-- set local option
-if [[ $setlocal == 0 && flag_image != 0 ]]; then
-    title_background=$MY_TITLE_BACKGOUND
-    flag_image=0
-fi
-
 #-- applying image settings
 if  [[ $flag_image == 0 ]]; then
-
+    
     sed -i "s;id=\"title-slide\";& data-background-image=$title_background;" $1
     echo "Title Background is set to: $title_background"
 
@@ -550,6 +537,14 @@ elif  [[ $flag_color == 0 ]]; then
     convert -size 3000x3000 xc:$title_background_color $color_image
     sed -i "s;id=\"title-slide\";& data-background-image=$color_image;" $1
     echo "Title Background is set to color $title_background_color"
+
+#-- set local option if no flag is raised
+elif [[  $setlocal == 0 ]]; then
+    
+    title_background=$MY_TITLE_BACKGOUND
+    sed -i "s;id=\"title-slide\";& data-background-image=$title_background;" $1
+    echo "Title Background is set to: $title_background"
+
 fi
 
 }
