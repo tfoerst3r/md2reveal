@@ -49,8 +49,8 @@ LEVEL_VAR=2
 MY_BIB_VAR="$HOME/literature/literature.bib"
 MY_LATEX_VAR="/opt/katex/"
 MY_LUA_VAR="$HOME/.lib/pandoc/output.lua"
-MY_REVEALJS_VAR="/opt/reveal.js"
-MY_THEME_VAR="hifis"
+MY_REVEALJS_VAR="\"/opt/reveal.js/\""
+MY_THEME_VAR="hifis1080p"
 MY_LEVEL_VAR=2
 
 
@@ -259,9 +259,9 @@ echo "$var"
 function set_revealjs(){
 
 local option="--variable revealjs-url"
-local setting_manually="$revealjs"
-local setting_default=$REVEALJS_VAR
-local setting_my=$MY_REVEALJS_VAR
+local setting_manually=${revealjs}
+local setting_default=${REVEALJS_VAR}
+local setting_my=${MY_REVEALJS_VAR}
 
 if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
     
@@ -303,34 +303,15 @@ echo "$var"
 
 function set_theme(){
 
+# TODO: what happens if theme is set in the metablock
+# => usage of grep ?
 local option="--metadata theme"
 local setting_manually="$theme"
-local setting_default=$THEME_VAR
-local setting_my=$MY_THEME_VAR
 
-if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
-    
-    if [[ $(check_variable $setting_my) == 0 ]]; then
-        # variable set manually
-        local var="$option=$setting_my"
-    elif [[ $(check_variable $setting_my) == 2 ]]; then
-        # variable not set, default
-        local var="$option=$setting_default"
-    fi 
-
-elif [[ $(check_variable $setting_manually) == 0 ]]; then
-    
+if [[ $(check_variable $setting_manually) == 0 ]]; then
     local var="$option=$setting_manually"
-
-elif [[ $(check_variable $setting_manually) == 2 ]]; then
-    
-    # variable not set, default
-    local var="$option=$setting_default"
-
 else
-    
     die "Error with the bibliography option"
-
 fi
 
 #..return value
@@ -593,9 +574,6 @@ local first_slide_header=$(sed -n '/^# [a-zA-Z0-9]/p' $document | head -n 1)
 local header=$(echo "$meta"; echo $'\n'; echo "$first_slide_header") 
 local body=$(cat $document | sed '/^---$/,/^# [a-zA-Z0-9]/d') 
 
-echo $texdef > tex.md
-echo $meta > meta.md
-
 echo "$header $texdef $body" > $1
 
 }
@@ -668,7 +646,7 @@ set_background $outfile
 set_video_plugin $outfile
 
 #==== Clean Up ====#
-rm $tmp$input
+#rm $tmp$input
 
 #=== END ===#
 
