@@ -49,7 +49,7 @@ LEVEL_VAR=2
 MY_BIB_VAR="$HOME/literature/literature.bib"
 MY_LATEX_VAR="/opt/katex/"
 MY_LUA_VAR="$HOME/.lib/pandoc/output.lua"
-MY_REVEALJS_VAR="\"/opt/reveal.js/\""
+MY_REVEALJS_VAR="./reveal.js"
 MY_THEME_VAR="hifis1080p"
 MY_LEVEL_VAR=2
 
@@ -442,7 +442,7 @@ Options:
       --latex STR                  location of your katex interpreter
       --lua STR                    location of additional lua filter 
       --revealjs STR               location of your revealjs installation
-      --theme                      name of the used theme 
+      --theme STR                  name of the used theme 
       --level NUM                  level definitions  
                                    NUM=0 slides are determined by dashes (min. 4 ----)
                                    NUM=1 slides are determined by heading level 1 
@@ -501,6 +501,11 @@ else
     die "No input markdown file with the extension *.md is given."
 fi
 
+if [[ ( $(check_variable $revealjs) == 0 || $setlocal == 0 ) && $(check_folder $MY_REVEALJS_VAR) != 0 ]];then
+die "<live-server does only work with relativ paths!
+Consider using soft or hardlinks"
+fi
+
 }    
 
 #== POST PROCESSING FUNCTIONS ==#
@@ -514,8 +519,6 @@ local flag_image=$(check_file $title_background)
 local flag_color=$(check_variable $title_background_color)
 local flag_color_image=$(check_file $color_image)
 
-echo $1
-
 #-- Checks
 if  [[ $flag_image == 0 && $flag_color == 0 ]]; then
     die "Title background image and color is defined. Please chose one only."
@@ -524,8 +527,8 @@ fi
 #-- applying image settings
 if  [[ $flag_image == 0 ]]; then
 
-    sed -i "s;id=\"title-slide\";& data-background-image=$titlebackground;" $1
-    echo "Title Background is set to: $titlebackground"
+    sed -i "s;id=\"title-slide\";& data-background-image=$title_background;" $1
+    echo "Title Background is set to: $title_background"
 
 elif  [[ $flag_color == 0 ]]; then
     
