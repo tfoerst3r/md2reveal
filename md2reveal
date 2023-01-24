@@ -679,6 +679,10 @@ function create_pdf(){
 
 if [[ "$create_pdf" == 0 ]]; then
     local filebase="${1%.*}"
+    
+    echo "-----------------------------------------------"
+    echo "-- Please remember to compile with level 1 ! --"
+    echo "-----------------------------------------------"
     echo "decktape automatic --size $printsize $1 $filebase.pdf"
     decktape automatic --size $printsize $1 $filebase.pdf
     exit 0
