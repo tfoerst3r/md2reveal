@@ -7,20 +7,9 @@ toc_var=1
 back_var=1
 create_pdf=1
 tmp="tmp_"
+
 #-- You can set the kroki, see docu to pandoc-kroki on github
 #KROKI_VAR=
-
-#-- Basic option settings
-texdef="
-
-\newcommand{\diff}{\mathrm{d}}
-\newcommand{\si}[1]{\mathrm{#1}}
-\newcommand{\SI}[2]{#1\,\mathrm{#2}}
-\newcommand{\*}{\ }
-\newcommand{\std}{\mathrm{o}}
-\newcommand{\surf}[1]{#1^{\prime\prime}}
-
-"
 
 #-- General options
 #.. katex CDN, see https://cdnjs.com/libraries/KaTeX
@@ -37,22 +26,26 @@ level=
 title_background=
 title_background_color=
 
+
 #== Default Settings ==#
 BIB_VAR="./literature.bib"
 LATEX_VAR=
 LUA_VAR=
-#REVEALJS_VAR="./reveal.js/" #not needed, web resource
-THEME_VAR="black"
+THEME_VAR="white"
 LEVEL_VAR=2
 
-#== My Default Settings ==#
-MY_BIB_VAR="$HOME/literature/literature.bib"
-MY_LATEX_VAR="./katex/"
-MY_LUA_VAR="$HOME/.lib/pandoc/output.lua"
-MY_REVEALJS_VAR="./reveal.js"
-MY_THEME_VAR="hifis1080p"
-MY_LEVEL_VAR=2
-MY_TITLE_BACKGOUND="./reveal.js/dist/theme/images/hifis-background-title-1080p.svg"
+
+#== Personal Settings ==#
+source $HOME/.md2revealrc
+
+
+#== Personal TEX commands ==#
+tex_varA=$(cat $HOME/.md2revealrc_tex)
+#-- newline command
+tex_varN='
+'
+#-- merged entry
+texdef="$tex_varN$tex_varA$tex_varN"
 
 #-------------#
 
@@ -217,7 +210,7 @@ function set_lua(){
 
 local option="--lua-filter"
 local setting_manually="$lua"
-local setting_default=$LATEX_VAR
+local setting_default=$LUA_VAR
 local setting_my=$MY_LUA_VAR
 
 if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
@@ -259,7 +252,6 @@ function set_revealjs(){
 
 local option="--variable revealjs-url"
 local setting_manually=${revealjs}
-local setting_default=${REVEALJS_VAR}
 local setting_my=${MY_REVEALJS_VAR}
 
 if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
@@ -289,7 +281,7 @@ elif [[ $(check_variable $setting_manually) == 2 ]]; then
 
 else
     
-    die "Error with the bibliography option"
+    die "Error with the revealjs option"
 
 fi
 
@@ -302,21 +294,59 @@ echo "$var"
 
 function set_theme(){
 
-# TODO: what happens if theme is set in the metablock
-# => usage of grep ?
-local option="--metadata theme"
+local option="--variable theme:"
 local setting_manually="$theme"
+local setting_default=$THEME_VAR
+local setting_my=$MY_THEME_VAR
 
-if [[ $(check_variable $setting_manually) == 0 ]]; then
-    local var="$option=$setting_manually"
+flag_theme_in_file=$(check_variable $theme_in_file)
+
+if [[ $flag_theme_in_file != 0 ]]; then
+
+    if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+    
+        # variable not set, my default
+        if [[ $(check_variable $setting_my) == 0 ]]; then
+            # variable set manually
+            local var="$option $setting_my"
+        elif [[ $(check_variable $setting_my) == 2 ]]; then
+            # variable not set, default
+            local var="$option$setting_default"
+        fi 
+    
+    elif [[ $(check_variable $setting_manually) == 0 ]]; then
+        
+        if [[ $(check_file $setting_manually) != 0 ]]; then
+            die "The given lua file $setting_manually does not exist."
+        else
+            # variable set manually
+            local var="$option=$setting_manually"
+        fi
+    
+    elif [[ $(check_variable $setting_manually) == 2 ]]; then
+        
+        # variable not set, default
+        local var="$option$setting_default"
+    
+    else
+        
+        die "Error with the theme option"
+    
+    fi
+
+elif [[ $flag_theme_in_file == 0 ]]; then
+
+    local var=""
+
 else
-    die "Error with the bibliography option"
+        
+    die "Error with the theme option"
+    
 fi
-
 #..return value
 echo "$var"
-
 }
+
 
 #-------------#
 
@@ -356,7 +386,7 @@ elif [[ $(check_variable $setting_manually) == 2 ]]; then
 
 else
     
-    die "Error with the bibliography option"
+    die "Error with the sidelevel option"
 
 fi
 
@@ -518,6 +548,10 @@ local flag_image=$(check_file $title_background)
 local flag_color=$(check_variable $title_background_color)
 local flag_color_image=$(check_file $color_image)
 
+local flag_my_color=$(check_variable $MY_TITLE_BACKGROUND_COLOR)
+local flag_my_image=$(check_variable $MY_TITLE_BACKGROUND_IMAGE)
+
+
 #-- Checks
 if  [[ $flag_image == 0 && $flag_color == 0 ]]; then
     die "Title background image and color is defined. Please chose one only."
@@ -527,24 +561,32 @@ fi
 if  [[ $flag_image == 0 ]]; then
     
     sed -i "s;id=\"title-slide\";& data-background-image=$title_background;" $1
-    echo "Title Background is set to: $title_background"
+    #echo "Title Background is set to: $title_background"
 
 elif  [[ $flag_color == 0 ]]; then
     
-    if [[ $flag_color_image == 0 ]]; then
-        echo "Background color image $color_image will be overwritten."   
-    fi
-    convert -size 3000x3000 xc:$title_background_color $color_image
-    sed -i "s;id=\"title-slide\";& data-background-image=$color_image;" $1
-    echo "Title Background is set to color $title_background_color"
+    sed -i "s;id=\"title-slide\";& data-background-color=$title_background_color;" $1
+    #echo "Title Background is set to color $title_background_color"
 
 #-- set local option if no flag is raised
 elif [[  $setlocal == 0 ]]; then
+    if  [[ $flag_my_image == 0 && $flag_my_color == 0 ]]; then
+        die "Only one own defined (.mdrevealrc) title background image and color can be used."
+    fi
     
-    title_background=$MY_TITLE_BACKGOUND
-    sed -i "s;id=\"title-slide\";& data-background-image=$title_background;" $1
-    echo "Title Background is set to: $title_background"
-
+    if  [[ $flag_my_image == 0 ]]; then
+        
+        title_background=$MY_TITLE_BACKGROUND_IMAGE
+        sed -i "s;id=\"title-slide\";& data-background-image=$title_background;" $1
+        #echo "Title Background is set to: $title_background"
+    
+    elif  [[ $flag_my_color == 0 ]]; then
+        
+        title_background_color=$MY_TITLE_BACKGROUND_COLOR
+        sed -i "s;id=\"title-slide\";& data-background-color=$title_background_color;" $1
+        #echo "Title Background is set to color $title_background_color"
+    
+    fi
 fi
 
 }
@@ -647,6 +689,7 @@ create_pdf $input
 
 #==== PREPROCESSING ====#
 #-- Pandoc settings --#
+theme_in_file=$(sed -n '/^---$/,/^---$/p' $input | grep theme:)
 pandoc_options=$(configure_pandoc_settings)
 
 #-- set output name --#
