@@ -251,8 +251,26 @@ echo "$var"
 function set_revealjs(){
 
 local option="--variable revealjs-url"
-local setting_manually=${revealjs}
-local setting_my=${MY_REVEALJS_VAR}
+
+local setting_manually="$revealjs"
+local setting_my="$MY_REVEALJS_VAR"
+
+#-- Prio A: manuell set reveal.js location
+if [[ $(check_variable $setting_manually) == 0 ]]; then
+    
+    local flag_is_folder=$(check_folder $setting_manually)
+    local webresource=$(wget --spider $setting_manually 2>&1 | grep "Remote file exists")
+    local flag_is_webresource=$(check_variable $webresource)
+
+    #-- check if the given folder/weblink actually exists
+    if [[ flag_is_folder == 0 ]]; then
+        local var="$option=$setting_manually"
+    elif [[ flag_is_webresource == 0 ]]; then
+        local var="$option=$setting_manually"
+    else
+        die "The given reveal.js path/weblink $setting_manually does not exist."
+    fi
+
 
 if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
     
@@ -284,6 +302,9 @@ else
     die "Error with the revealjs option"
 
 fi
+
+# globally set for further evaluation
+revealjs="$var"
 
 #..return value
 echo "$var"
@@ -349,7 +370,6 @@ fi
 #..return value
 echo "$var"
 }
-
 
 #-------------#
 
@@ -524,7 +544,7 @@ while [ -n "$1" ]; do
   esac
 done
 
-#-- checks --#
+#-- checks input --#
 if [[ $(check_file $1) == 0 && ${1##*.} == md ]]; then
     input=$1
 elif [[ $(check_file $1) == 0 && ${1##*.} == html && $create_pdf == 0 ]]; then
@@ -533,9 +553,9 @@ else
     die "No input markdown file with the extension *.md is given."
 fi
 
+#-- check if relative paths are used --#
 if [[ ( $(check_variable $revealjs) == 0 || $setlocal == 0 ) && $(check_folder $MY_REVEALJS_VAR) != 0 ]];then
-die "<live-server does only work with relativ paths!
-Consider using soft or hardlinks"
+die "The tool <live-server> does only work with relativ paths!" 
 fi
 
 }    
@@ -637,16 +657,14 @@ echo "$header $texdef $body" > $1
 
 function set_video_plugin(){
 #.. add video.js online resource link in the head
-local script=
-local videojs="<link href=\"//vjs.zencdn.net/7.10.2/video-js.min.css\" rel=\"stylesheet\">\n<script src=\"//vjs.zencdn.net/7.10.2/video.min.js\"></script>"
+local script="<script src=\"//vjs.zencdn.net/7.10.2/video.min.js\"></script>"
+local link="<link href=\"//vjs.zencdn.net/7.10.2/video-js.min.css\" rel=\"stylesheet\">"
 #.. append the string
-sed -i "/<head>/a $videojs" $1
+sed -i "/<head>/a $script" $1
+sed -i "/<head>/a $link" $1
 }
 
-
-
-
-function set_plugins(){
+function set_board_plugin(){
 #.. add revealjs drawer plugin
 local header1="<script src=\"./reveal.js/plugin/chalkboard/plugin.js\"></script>"
 local header2="<link rel=\"stylesheet\" href=\"./reveal.js/plugin/chalkboard/style.css\">"
@@ -664,6 +682,13 @@ sed -i "/<head>/a $header3" $1
 sed -i "/<head>/a $header1" $1
 sed -i "/RevealNotes,/a $plugin1" $1
 #sed -i "/RevealNotes,/a $plugin2" $1
+}
+#-----------------------#
+
+function set_plugins(){
+
+set_video_plugin $1
+
 }
 
 #-----------------------#
@@ -723,9 +748,9 @@ pandoc $pandoc_options $tmp$input -o $outfile
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 #==== PREPROCESSING ====#
+echo "var revealjs: $revealjs"
 set_background $outfile
-set_video_plugin $outfile
-#set_plugins $outfile
+set_plugins $outfile
 #==== Clean Up ====#
 rm $tmp$input
 
