@@ -299,7 +299,7 @@ local setting_manually="$theme"
 local setting_default=$THEME_VAR
 local setting_my=$MY_THEME_VAR
 
-flag_theme_in_file=$(check_variable $theme_in_file)
+local flag_theme_in_file=$(check_variable $theme_in_file)
 
 if [[ $flag_theme_in_file != 0 ]]; then
 
@@ -308,20 +308,16 @@ if [[ $flag_theme_in_file != 0 ]]; then
         # variable not set, my default
         if [[ $(check_variable $setting_my) == 0 ]]; then
             # variable set manually
-            local var="$option $setting_my"
+            local var="$option$setting_my"
         elif [[ $(check_variable $setting_my) == 2 ]]; then
             # variable not set, default
             local var="$option$setting_default"
         fi 
     
     elif [[ $(check_variable $setting_manually) == 0 ]]; then
-        
-        if [[ $(check_file $setting_manually) != 0 ]]; then
-            die "The given lua file $setting_manually does not exist."
-        else
-            # variable set manually
-            local var="$option=$setting_manually"
-        fi
+            
+        # variable set manually
+        local var="$option$setting_manually"
     
     elif [[ $(check_variable $setting_manually) == 2 ]]; then
         
@@ -690,6 +686,7 @@ create_pdf $input
 #==== PREPROCESSING ====#
 #-- Pandoc settings --#
 theme_in_file=$(sed -n '/^---$/,/^---$/p' $input | grep theme:)
+#echo "theme in file $(check_variable $theme_in_file)"
 pandoc_options=$(configure_pandoc_settings)
 
 #-- set output name --#
