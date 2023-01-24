@@ -301,34 +301,41 @@ local setting_my=$MY_THEME_VAR
 
 local flag_theme_in_file=$(check_variable $theme_in_file)
 
+#-- Prio 0: theme is set in file itself
 if [[ $flag_theme_in_file != 0 ]]; then
-
-    if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
     
-        # variable not set, my default
-        if [[ $(check_variable $setting_my) == 0 ]]; then
-            # variable set manually
-            local var="$option$setting_my"
-        elif [[ $(check_variable $setting_my) == 2 ]]; then
-            # variable not set, default
-            local var="$option$setting_default"
-        fi 
-    
-    elif [[ $(check_variable $setting_manually) == 0 ]]; then
+    #------------------------------------------------------#
+    #-- Prio A: manuell set variable
+    if [[ $(check_variable $setting_manually) == 0 ]]; then
             
         # variable set manually
         local var="$option$setting_manually"
     
-    elif [[ $(check_variable $setting_manually) == 2 ]]; then
+    #-- Prio B: global defined variable (.mdrevealrc)
+    elif [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
         
-        # variable not set, default
+        #-- global variable exists
+        if [[ $(check_variable $setting_my) == 0 ]]; then
+            
+            local var="$option$setting_my"
+        
+        #-- global variable does not exists, fallback to default
+        else
+            
+            local var="$option$setting_default"
+        
+        fi 
+    #-- Prio C: default setting 
+    elif [[ $(check_variable $setting_default) == 0 ]]; then
+        
         local var="$option$setting_default"
-    
+ 
     else
         
         die "Error with the theme option"
     
     fi
+    #------------------------------------------------------#
 
 elif [[ $flag_theme_in_file == 0 ]]; then
 
@@ -630,19 +637,20 @@ echo "$header $texdef $body" > $1
 
 function set_video_plugin(){
 #.. add video.js online resource link in the head
+local script=
 local videojs="<link href=\"//vjs.zencdn.net/7.10.2/video-js.min.css\" rel=\"stylesheet\">\n<script src=\"//vjs.zencdn.net/7.10.2/video.min.js\"></script>"
 #.. append the string
 sed -i "/<head>/a $videojs" $1
 }
 
-function set_plugin(){
-#.. add revealjs drawer plugin
 
+
+
+function set_plugins(){
+#.. add revealjs drawer plugin
 local header1="<script src=\"./reveal.js/plugin/chalkboard/plugin.js\"></script>"
-#local header2="<script src=\"./reveal.js/plugin/customcontrols/plugin.js\"></script>"
-local header3="<link rel=\"stylesheet\" href=\"./reveal.js/plugin/chalkboard/style.css\">"
-#local header4="<link rel=\"stylesheet\" href=\"./reveal.js/plugin/customcontrols/style.css\">"
-local header5="<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/reveal.js-plugins/menu/font-awesome/css/fontawesome.css\">"
+local header2="<link rel=\"stylesheet\" href=\"./reveal.js/plugin/chalkboard/style.css\">"
+local header3="<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/reveal.js-plugins/menu/font-awesome/css/fontawesome.css\">"
 local plugin1="RevealChalkboard,"
 local plugin2="RevealCustomControls,"
 
@@ -657,7 +665,6 @@ sed -i "/<head>/a $header1" $1
 sed -i "/RevealNotes,/a $plugin1" $1
 #sed -i "/RevealNotes,/a $plugin2" $1
 }
-
 
 #-----------------------#
 
@@ -718,9 +725,9 @@ pandoc $pandoc_options $tmp$input -o $outfile
 #==== PREPROCESSING ====#
 set_background $outfile
 set_video_plugin $outfile
-#set_plugin $outfile
+#set_plugins $outfile
 #==== Clean Up ====#
-#rm $tmp$input
+rm $tmp$input
 
 #=== END ===#
 
