@@ -775,7 +775,7 @@ pandoc $pandoc_options $tmp$input -o $outfile
 set_background $outfile
 set_plugins $outfile
 #==== Clean Up ====#
-#rm $tmp$input
+rm $tmp$input
 
 #=== END ===#
 
