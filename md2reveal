@@ -271,8 +271,8 @@ if [[ $(check_variable $setting_manually) == 0 ]]; then
         die "The given reveal.js path/weblink $setting_manually does not exist."
     fi
 
-
-if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
+#-- Prio B: global variable (.md2revealrc)
+elif [[ $setlocal == 0 ]]; then
     
     # variable not set, my default
     if [[ $(check_variable $setting_my) == 0 ]]; then
