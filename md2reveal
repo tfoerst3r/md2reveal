@@ -47,7 +47,7 @@ LEVEL_VAR=2
 
 #== My Default Settings ==#
 MY_BIB_VAR="$HOME/literature/literature.bib"
-MY_LATEX_VAR="/opt/katex/"
+MY_LATEX_VAR="./katex/"
 MY_LUA_VAR="$HOME/.lib/pandoc/output.lua"
 MY_REVEALJS_VAR="./reveal.js"
 MY_THEME_VAR="hifis1080p"
@@ -183,7 +183,7 @@ if [[ $setlocal == 0 && $(check_variable $setting_manually) != 0 ]]; then
     # variable not set, my default
     if [[ $(check_variable $setting_my) == 0 ]]; then
         # variable set manually
-        local var="$option=\"$setting_my\""
+        local var="$option=$setting_my"
     elif [[ $(check_variable $setting_my) == 2 ]]; then
         # variable not set, default
         local var="$option"
@@ -438,7 +438,7 @@ Options:
  -o   --output                     determines output file name 
       --local                      uses your own default settings, TODO still in the script itself
       --bibliography STR           location of your citation file *.bib format
-      --latex STR                  location of your katex interpreter
+      --katex STR                  location of your katex interpreter
       --lua STR                    location of additional lua filter 
       --revealjs STR               location of your revealjs installation
       --theme STR                  name of the used theme 
@@ -473,7 +473,7 @@ while [ -n "$1" ]; do
     -o  | --output                 ) outfile="$2"; shift 2 ;;
           --local                  ) setlocal=0; shift 1 ;;
           --bibliography           ) bibliography="$2"; shift 2 ;;
-          --latex                  ) latex="$2"; shift 2 ;;
+          --katex                  ) latex="$2"; shift 2 ;;
           --lua                    ) lua="$2"; shift 2 ;;
           --revealjs               ) revealjs="$2"; shift 2 ;;
           --theme                  ) theme="$2"; shift 2 ;;
@@ -597,6 +597,30 @@ local videojs="<link href=\"//vjs.zencdn.net/7.10.2/video-js.min.css\" rel=\"sty
 sed -i "/<head>/a $videojs" $1
 }
 
+function set_plugin(){
+#.. add revealjs drawer plugin
+
+local header1="<script src=\"./reveal.js/plugin/chalkboard/plugin.js\"></script>"
+#local header2="<script src=\"./reveal.js/plugin/customcontrols/plugin.js\"></script>"
+local header3="<link rel=\"stylesheet\" href=\"./reveal.js/plugin/chalkboard/style.css\">"
+#local header4="<link rel=\"stylesheet\" href=\"./reveal.js/plugin/customcontrols/style.css\">"
+local header5="<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/reveal.js-plugins/menu/font-awesome/css/fontawesome.css\">"
+local plugin1="RevealChalkboard,"
+local plugin2="RevealCustomControls,"
+
+#local drawerjs="<link rel="stylesheet" href="./reveal.js/plugin/drawer/drawer.css" />\n<script src="./reveal.js/plugin/drawer/drawer.js"></script>"
+#local plugin_init="RevealDrawer,"
+
+sed -i "/<head>/a $header5" $1
+#sed -i "/<head>/a $header4" $1
+sed -i "/<head>/a $header3" $1
+#sed -i "/<head>/a $header2" $1
+sed -i "/<head>/a $header1" $1
+sed -i "/RevealNotes,/a $plugin1" $1
+#sed -i "/RevealNotes,/a $plugin2" $1
+}
+
+
 #-----------------------#
 
 function create_pdf(){
@@ -654,9 +678,9 @@ pandoc $pandoc_options $tmp$input -o $outfile
 #==== PREPROCESSING ====#
 set_background $outfile
 set_video_plugin $outfile
-
+#set_plugin $outfile
 #==== Clean Up ====#
-rm $tmp$input
+#rm $tmp$input
 
 #=== END ===#
 
