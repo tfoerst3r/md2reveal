@@ -34,19 +34,6 @@ LUA_VAR=
 THEME_VAR="white"
 LEVEL_VAR=2
 
-
-#== Personal Settings ==#
-source $HOME/.md2revealrc
-
-
-#== Personal TEX commands ==#
-tex_varA=$(cat $HOME/.md2revealrc_tex)
-#-- newline command
-tex_varN='
-'
-#-- merged entry
-texdef="$tex_varN$tex_varA$tex_varN"
-
 #-------------#
 
 function die() {
@@ -263,9 +250,9 @@ if [[ $(check_variable $setting_manually) == 0 ]]; then
     local flag_is_webresource=$(check_variable $webresource)
 
     #-- check if the given folder/weblink actually exists
-    if [[ flag_is_folder == 0 ]]; then
+    if [[ $flag_is_folder == 0 ]]; then
         local var="$option=$setting_manually"
-    elif [[ flag_is_webresource == 0 ]]; then
+    elif [[ $flag_is_webresource == 0 ]]; then
         local var="$option=$setting_manually"
     else
         die "The given reveal.js path/weblink $setting_manually does not exist."
@@ -283,15 +270,7 @@ elif [[ $setlocal == 0 ]]; then
         local var=""
     fi 
 
-elif [[ $(check_variable $setting_manually) == 0 ]]; then
-    
-    if [[ $(check_folder $setting_manually) != 0 ]]; then
-        die "The given reveal.js path $setting_manually does not exist."
-    else
-        # variable set manually
-        local var="$option=$setting_manually"
-    fi
-
+#-- Prio C: default variable if not set manually or globally
 elif [[ $(check_variable $setting_manually) == 2 ]]; then
     
     # variable not set, default
@@ -302,9 +281,6 @@ else
     die "Error with the revealjs option"
 
 fi
-
-# globally set for further evaluation
-revealjs="$var"
 
 #..return value
 echo "$var"
@@ -553,10 +529,6 @@ else
     die "No input markdown file with the extension *.md is given."
 fi
 
-#-- check if relative paths are used --#
-if [[ ( $(check_variable $revealjs) == 0 || $setlocal == 0 ) && $(check_folder $MY_REVEALJS_VAR) != 0 ]];then
-die "The tool <live-server> does only work with relativ paths!" 
-fi
 
 }    
 
@@ -656,9 +628,19 @@ echo "$header $texdef $body" > $1
 #-----------------------#
 
 function set_video_plugin(){
-#.. add video.js online resource link in the head
-local script="<script src=\"//vjs.zencdn.net/7.10.2/video.min.js\"></script>"
-local link="<link href=\"//vjs.zencdn.net/7.10.2/video-js.min.css\" rel=\"stylesheet\">"
+
+revealjs_folder=$(echo "$pandoc_options" | grep 'revealjs-url=./')
+flag_revealjs_folder=$(check_variable $revealjs_post)
+
+if [[ $flag_revealjs_folder == 0 ]]; then
+    #.. add video.js online resource link in the head
+    local script="<script src=\"./reveal.js/plugin/video/video.min.js\"></script>"
+    local link="<link href=\"./reveal.js/plugin/video/video-js.min.css\" rel=\"stylesheet\">"
+else
+    #.. add video.js online resource link in the head
+    local script="<script src=\"//vjs.zencdn.net/7.10.2/video.min.js\"></script>"
+    local link="<link href=\"//vjs.zencdn.net/7.10.2/video-js.min.css\" rel=\"stylesheet\">"
+fi
 #.. append the string
 sed -i "/<head>/a $script" $1
 sed -i "/<head>/a $link" $1
@@ -708,18 +690,60 @@ fi
 #----- Main Script -----#
 #-----------------------#
 
+#== Personal Settings ==#
+if [[ $(check_file $HOME/.md2revealrc) == 0 ]]; then
+    source $HOME/.md2revealrc
+else
+    MY_BIB_VAR=
+    MY_LATEX_VAR=
+    MY_LUA_VAR=
+    MY_REVEALJS_VAR=
+    MY_THEME_VAR=
+    MY_LEVEL_VAR=
+    MY_TITLE_BACKGROUND_IMAGE=
+    MY_TITLE_BACKGROUND_COLOR=
+fi
+
+#== Personal TEX commands ==#
+if [[ $(check_file $HOME/.md2revealrc_tex) == 0 ]]; then
+tex_varA=$(cat $HOME/.md2revealrc_tex)
+#-- add newline command
+tex_varN='
+
+'
+#-- merged entry
+texdef="$tex_varN$tex_varA$tex_varN"
+else
+texdef="
+
+\newcommand{\si}[1]{\mathrm{#1}}
+\newcommand{\SI}[2]{#1\,\mathrm{#2}}
+\newcommand{\*}{\ }
+
+"
+fi
+
 #==== Argument parser ====#
 #.. setting, do not use a subshell for this
+#.. creats a lot of global var, e.q. $input
 argparser $@
 
 #==== PDF ====#
 create_pdf $input
 
 #==== PREPROCESSING ====#
-#-- Pandoc settings --#
+#-- extract if theme is defined the markdown file
 theme_in_file=$(sed -n '/^---$/,/^---$/p' $input | grep theme:)
-#echo "theme in file $(check_variable $theme_in_file)"
+
+#-- pandoc settings --#
 pandoc_options=$(configure_pandoc_settings)
+
+##-- check if relative paths are used --#
+#TODO this will fail if default is used
+#if [[ ( $(check_variable $revealjs) == 0 || $setlocal == 0 ) && $(check_folder $MY_REVEALJS_VAR) != 0 ]];then
+#die "The tool <live-server> does only work with relativ paths!" 
+#fi
+
 
 #-- set output name --#
 if [[ -z $outfile ]]; then
@@ -748,11 +772,10 @@ pandoc $pandoc_options $tmp$input -o $outfile
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 #==== PREPROCESSING ====#
-echo "var revealjs: $revealjs"
 set_background $outfile
 set_plugins $outfile
 #==== Clean Up ====#
-rm $tmp$input
+#rm $tmp$input
 
 #=== END ===#
 
